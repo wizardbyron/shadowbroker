@@ -1,0 +1,141 @@
+Parameters:
+  
+  ShadowPort:
+    Type: String
+    Default: 8388
+  
+  ShadowPassword:
+    Type: String
+    Default: password
+
+  Region:
+    Type: String
+    Default: ap-southeast-1
+
+  AMI:
+    Type: String
+    Default: ami-0cbc6aae997c6538a
+
+Resources:
+
+  ShadowVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: 10.0.0.0/28
+      EnableDnsHostnames: True
+      EnableDnsSupport: True
+      Tags: 
+        - Key: Name
+          Value: "shadowzone-vpc"
+    
+  ShadowSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: ShadowVPC
+      CidrBlock: 10.0.0.0/28
+      AvailabilityZone:
+        Fn::Join:
+          - ""
+          - - Ref: Region
+            - "a"
+      Tags:
+      - Key: Name
+        Value: "shadowzone-subnet"
+
+  ShadowSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "shadowzone-securitygroup"
+      SecurityGroupEgress:
+      - CidrIp: 0.0.0.0/0
+        IpProtocol: "-1"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0  
+      - IpProtocol: tcp
+        FromPort: 8388
+        ToPort: 8388
+        CidrIp: 0.0.0.0/0  
+      VpcId:
+        Ref: ShadowVPC
+
+  ShadowInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  ShadowVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: 
+        Ref: ShadowInternetGateway
+      VpcId: 
+        Ref: ShadowVPC
+
+  ShadowRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  
+        Ref: ShadowVPC
+
+  ShadowRoute:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId:
+         Ref: ShadowRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId:
+         Ref: ShadowInternetGateway
+
+  ShadowSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: 
+        Ref: ShadowRouteTable
+      SubnetId: 
+        Ref: ShadowSubnet
+
+  ShadowInstance:
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId:
+        Ref: AMI
+      InstanceType: t3.nano
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - Ref: ShadowSecurityGroup
+          SubnetId: 
+            Ref: ShadowSubnet
+      UserData:
+        Fn::Base64:
+          Fn::Join: 
+            - "\n"
+            - - "#!/bin/bash -ex"
+              - "sudo yum update -y"
+              - "sudo yum install -y python-pip"
+              - "sudo pip install shadowsocks"
+              - Fn::Join:
+                - ""
+                - - "sudo ssserver -p "
+                  - Ref: ShadowPort
+                  - " -k "
+                  - Ref: ShadowPassword
+                  - " -m aes-256-cfb --user nobody -d start"
+
+Outputs:
+  ShadowZoneIP:
+    Description: The IP of shadowzone
+    Value:
+      Fn::GetAtt: ShadowInstance.PublicIp
+    Export:
+      Name: shadowzone-ip
+
+  ShadowZoneHostname:
+    Description: The hosename of shadowzone
+    Value:
+      Fn::GetAtt: ShadowInstance.PublicDnsName
+    Export:
+      Name: shadowzone-hostname
