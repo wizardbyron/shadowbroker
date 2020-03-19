@@ -49,15 +49,13 @@ Resources:
       GroupDescription: "shadowzone-securitygroup"
       SecurityGroupEgress:
       - CidrIp: 0.0.0.0/0
-        IpProtocol: "-1"
+        IpProtocol: -1
       SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIp: 0.0.0.0/0  
-      - IpProtocol: tcp
-        FromPort: 8388
-        ToPort: 8388
+      - IpProtocol: -1
+        FromPort:
+          Ref: ShadowPort
+        ToPort:
+          Ref: ShadowPort
         CidrIp: 0.0.0.0/0  
       VpcId:
         Ref: ShadowVPC
