@@ -1,0 +1,195 @@
+Parameters:
+  
+  ShadowPort:
+    Type: String
+    Default: 8388
+  
+  ShadowPassword:
+    Type: String
+    Default: password
+
+  Region:
+    Type: String
+    Default: ap-southeast-1
+
+  AMI:
+    Type: String
+    Default: ami-0cbc6aae997c6538a
+
+Resources:
+
+  ShadowVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: "10.0.0.0/28"
+      EnableDnsHostnames: True
+      EnableDnsSupport: True
+      Tags: 
+        - Key: Name
+          Value: "shadowzone-asg-vpc"
+    
+  ShadowSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: ShadowVPC
+      CidrBlock: "10.0.0.0/28"
+      AvailabilityZone:
+        Fn::Join:
+          - ""
+          - - Ref: Region
+            - "a"
+      Tags:
+      - Key: Name
+        Value: "shadowzone-asg-subnet"
+
+  ShadowSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "shadowzone-asg-securitygroup"
+      SecurityGroupEgress:
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+      SecurityGroupIngress:
+      - IpProtocol: "-1"
+        FromPort: 
+          Ref: ShadowPort
+        ToPort: 
+          Ref: ShadowPort
+        CidrIp: "0.0.0.0/0"
+      VpcId:
+        Ref: ShadowVPC
+
+  ShadowInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  ShadowVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: 
+        Ref: ShadowInternetGateway
+      VpcId: 
+        Ref: ShadowVPC
+
+  ShadowRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  
+        Ref: ShadowVPC
+
+  ShadowRoute:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId:
+         Ref: ShadowRouteTable
+       DestinationCidrBlock: "0.0.0.0/0"
+       GatewayId:
+         Ref: ShadowInternetGateway
+
+  ShadowSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: 
+        Ref: ShadowRouteTable
+      SubnetId: 
+        Ref: ShadowSubnet
+
+  ShadowLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: shadowzone-launch-template
+      LaunchTemplateData: 
+        ImageId:
+          Ref: AMI
+        InstanceType: t3.nano
+        NetworkInterfaces: 
+          - AssociatePublicIpAddress: "true"
+            DeviceIndex: "0"
+            Groups: 
+              - Ref: ShadowSecurityGroup
+            SubnetId: 
+              Ref: ShadowSubnet
+        UserData:
+          Fn::Base64:
+            Fn::Join: 
+              - "\n"
+              - - "#!/bin/bash -ex"
+                - "sudo yum update -y"
+                - "sudo yum install -y python-pip"
+                - "sudo pip install shadowsocks"
+                - Fn::Join:
+                  - ""
+                  - - "sudo ssserver -p "
+                    - Ref: ShadowPort
+                    - " -k "
+                    - Ref: ShadowPassword
+                    - " -m aes-256-cfb --user nobody -d start"
+
+  ShadowASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: ShadowASG
+      MinSize: "0"
+      MaxSize: "1"
+      DesiredCapacity: "1"
+      LaunchTemplate:
+        LaunchTemplateId:
+          Ref: ShadowLaunchTemplate
+        Version:
+          Fn::GetAtt: ShadowLaunchTemplate.DefaultVersionNumber
+      VPCZoneIdentifier:
+        - Ref: ShadowSubnet
+      TargetGroupARNs:
+        - Ref: ShadowTargetGroup
+
+  ShadowTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      Port: 
+        Ref: ShadowPort
+      Protocol: "TCP_UDP"
+      HealthCheckProtocol: "TCP"
+      TargetType: instance
+      VpcId: 
+        Ref: ShadowVPC
+
+  ShadowLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: ShadowInternetGateway
+    Properties:
+      Scheme: "internet-facing"
+      Subnets:
+        - Ref: ShadowSubnet
+      Type: network
+
+  ShadowListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      Port: 
+        Ref: ShadowPort  
+      Protocol: "TCP_UDP"
+      LoadBalancerArn: 
+        Ref: ShadowLoadBalancer  
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: ShadowTargetGroup
+      
+  ShadowScheduledActionOut: 
+    Type: AWS::AutoScaling::ScheduledAction
+    Properties:
+      AutoScalingGroupName: 
+        Ref: ShadowASG
+      MaxSize: "1"
+      MinSize: "1"
+      Recurrence: "0 0 * * *"
+    
+  ShadowScheduledActionIn: 
+    Type: AWS::AutoScaling::ScheduledAction
+    Properties:
+      AutoScalingGroupName: 
+        Ref: ShadowASG
+      MaxSize: "0"
+      MinSize: "0"
+      Recurrence: "0 16 * * *"
+
