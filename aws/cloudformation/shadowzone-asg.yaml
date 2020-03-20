@@ -193,3 +193,16 @@ Resources:
       MinSize: "0"
       Recurrence: "0 16 * * *"
 
+Outputs:
+  ShadowZoneServerCM:
+    Description: The IP of shadowzone
+    Value:
+      Fn::Join:
+        - ""
+        - - "sudo ssserver -p "
+          - Ref: ShadowPort
+          - " -k "
+          - Ref: ShadowPassword
+          - " -m aes-256-cfb --user nobody -d start"
+    Export:
+      Name: shadowzone-cmd
