@@ -136,7 +136,7 @@ Resources:
         LaunchTemplateId:
           Ref: ShadowLaunchTemplate
         Version:
-          Fn::GetAtt: ShadowLaunchTemplate.DefaultVersionNumber
+          Fn::GetAtt: ShadowLaunchTemplate.LatestVersionNumber
       VPCZoneIdentifier:
         - Ref: ShadowSubnet
       TargetGroupARNs:
