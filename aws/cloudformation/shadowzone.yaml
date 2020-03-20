@@ -130,10 +130,3 @@ Outputs:
       Fn::GetAtt: ShadowInstance.PublicIp
     Export:
       Name: shadowzone-ip
-
-  ShadowZoneHostname:
-    Description: The hosename of shadowzone
-    Value:
-      Fn::GetAtt: ShadowInstance.PublicDnsName
-    Export:
-      Name: shadowzone-hostname
