@@ -1,5 +1,4 @@
 Parameters:
-  
   ShadowPort:
     Type: String
     Default: 8388
@@ -17,7 +16,6 @@ Parameters:
     Default: ami-0cbc6aae997c6538a
 
 Resources:
-
   ShadowVPC:
     Type: AWS::EC2::VPC
     Properties: 
@@ -109,6 +107,11 @@ Resources:
               - Ref: ShadowSecurityGroup
             SubnetId: 
               Ref: ShadowSubnet
+        TagSpecifications:
+          - ResourceType: "instance"
+            Tags:
+              - Key: Name
+                Value: "shadow-asg-instance"
         UserData:
           Fn::Base64:
             Fn::Join: 
@@ -128,7 +131,7 @@ Resources:
   ShadowASG:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AutoScalingGroupName: ShadowASG
+      AutoScalingGroupName: "shadowzone-asg"
       MinSize: "0"
       MaxSize: "1"
       DesiredCapacity: "1"
@@ -195,7 +198,7 @@ Resources:
 
 Outputs:
   ShadowZoneServerStartCMD:
-    Description: The IP of shadowzone
+    Description: "The ssserver launch command"
     Value:
       Fn::Join:
         - ""
