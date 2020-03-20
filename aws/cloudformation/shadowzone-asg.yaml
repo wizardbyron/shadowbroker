@@ -194,7 +194,7 @@ Resources:
       Recurrence: "0 16 * * *"
 
 Outputs:
-  ShadowZoneServerCM:
+  ShadowZoneServerStartCMD:
     Description: The IP of shadowzone
     Value:
       Fn::Join:
@@ -205,4 +205,4 @@ Outputs:
           - Ref: ShadowPassword
           - " -m aes-256-cfb --user nobody -d start"
     Export:
-      Name: shadowzone-cmd
+      Name: shadowzone-asg-launch-cmd

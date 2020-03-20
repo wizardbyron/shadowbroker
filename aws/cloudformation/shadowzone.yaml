@@ -129,4 +129,17 @@ Outputs:
     Value:
       Fn::GetAtt: ShadowInstance.PublicIp
     Export:
-      Name: shadowzone-ip
+      Name: shadowzone-instance-ip
+
+  ShadowZoneServerStartCMD:
+    Description: The IP of shadowzone
+    Value:
+      Fn::Join:
+        - ""
+        - - "sudo ssserver -p "
+          - Ref: ShadowPort
+          - " -k "
+          - Ref: ShadowPassword
+          - " -m aes-256-cfb --user nobody -d start"
+    Export:
+      Name: shadowzone-instance-cmd
